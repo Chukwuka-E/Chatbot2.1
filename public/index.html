@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Quest Support Chatbot - AI-powered assistance for all your queries">
+    <title>Quest Support Chatbot</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
+    <style>
+        :root {
+            --header-bg: linear-gradient(135deg, #2c3e50, #3498db);
+            --text-color: #ecf0f1;
+            --accent: #3498db;
+            --bg-color: #ffffff;
+        }
+
+        [data-theme="dark"] {
+            --header-bg: linear-gradient(135deg, #0f172a, #1e293b);
+            --text-color: #f8fafc;
+            --accent: #7dd3fc;
+            --bg-color: #0f172a;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background-color: var(--bg-color);
+            transition: background 0.3s ease;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--header-bg);
+            padding: 1rem;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            border-radius: 0 0 15px 15px;
+        }
+
+        .logo-container {
+            display: inline-flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .peace-dove {
+            width: 50px;
+            height: 50px;
+            background: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2024%2024'%3E%3Cpath%20fill%3D'%23ffffff'%20d%3D'M22%2011.5C22%2012.27%2021.92%2013.03%2021.82%2013.8L19.94%2013L22%2011.5M12%2012.72C12%2012.72%206%2011%206%209.71C6%209.21%206.83%208.14%208.34%207.5C7.86%208.45%207.7%209.22%207.7%209.69C7.7%2011.15%2012%2013.34%2012%2013.34S16.3%2011.15%2016.3%209.69C16.3%209.22%2016.14%208.45%2015.66%207.5C17.17%208.14%2018%209.21%2018%209.71C18%2011%2012%2012.72%2012%2012.72M9.27%2017L8%2017.28L6.73%2017C5.33%2017%204.14%2015.97%203.56%2014.57L2%2015.28L2.47%2016.53L3.89%2016.12C4.31%2017.37%205.19%2018.39%206.32%2018.93L5.41%2020.23L6.75%2021.05L7.66%2019.75C8.11%2019.86%208.58%2019.93%209.07%2019.93C9.56%2019.93%2010.03%2019.86%2010.48%2019.75L11.39%2021.05L12.73%2020.23L11.82%2018.93C12.95%2018.39%2013.83%2017.37%2014.25%2016.12L15.67%2016.53L16.14%2015.28L14.58%2014.57C14%2015.97%2012.81%2017%2011.41%2017H10.88L10.57%2016.12L9.27%2017Z'%2F%3E%3C%2Fsvg%3E");
+            background-size: contain;
+        }
+
+        .quest-text {
+            font-family: 'Arial Rounded MT Bold', sans-serif;
+            font-size: clamp(1.8rem, 6vw, 2.5rem);
+            background: linear-gradient(45deg, var(--text-color), #fff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: 1px;
+        }
+
+        .chat-container {
+            max-width: 800px;
+            margin: 20px auto;
+            background-color: var(--bg-color);
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .chat-box {
+            height: 500px;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .message {
+            margin: 10px 0;
+            padding: 10px 15px;
+            border-radius: 20px;
+            max-width: 70%;
+            transition: background-color 0.3s ease;
+        }
+
+        .user-message {
+            background-color: var(--accent);
+            color: white;
+            margin-left: auto;
+        }
+
+        .bot-message {
+            background-color: #e9ecef;
+            color: black;
+            margin-right: auto;
+        }
+
+        .input-container {
+            display: flex;
+            padding: 20px;
+            border-top: 1px solid #ddd;
+        }
+
+        #user-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-right: 10px;
+            background-color: var(--bg-color);
+            color: inherit;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .history-panel {
+            position: fixed;
+            left: 20px;
+            top: 100px;
+            width: 250px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            max-height: 70vh;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .history-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: #f5f5f5;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .history-item:hover {
+            background: #e0e0e0;
+        }
+
+        .history-toggle {
+            position: fixed;
+            left: 20px;
+            top: 70px;
+            padding: 8px 15px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            transition: background 0.3s ease;
+            z-index: 1001;
+        }
+
+        .toggle-icon {
+            width: 24px;
+            height: 24px;
+            fill: var(--text-color);
+        }
+
+        .contact-footer {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,123,255,0.9);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 25px;
+            font-size: 14px;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+            transition: all 0.3s ease;
+        }
+
+        .contact-footer a {
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .prompt-bubble {
+            position: fixed;
+            bottom: 100px;
+            left: 20px;
+            background: rgba(233,236,239,0.95);
+            color: #495057;
+            padding: 12px 18px;
+            border-radius: 20px;
+            font-size: 14px;
+            z-index: 999;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            animation: float 3s ease-in-out infinite;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .prompt-bubble::before {
+            content: "";
+            position: absolute;
+            bottom: -10px;
+            left: 20px;
+            border-width: 10px 8px 0;
+            border-style: solid;
+            border-color: rgba(233,236,239,0.95) transparent transparent;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        @media (max-width: 768px) {
+            .chat-container {
+                margin: 10px;
+                border-radius: 8px;
+            }
+            
+            .chat-box {
+                height: 400px;
+            }
+            
+            .contact-footer {
+                bottom: 10px;
+                right: 10px;
+                font-size: 12px;
+                padding: 8px 12px;
+            }
+            
+            .prompt-bubble {
+                bottom: 90px;
+                left: 10px;
+                font-size: 12px;
+            }
+            
+            .history-panel {
+                width: 200px;
+                left: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo-container">
+            <div class="peace-dove"></div>
+            <h1 class="quest-text">QUEST</h1>
+        </div>
+    </header>
+
+    <button class="history-toggle" onclick="toggleHistory()" aria-label="Chat history">Chat History</button>
+    <div class="history-panel" id="historyPanel">
+        <div id="historyList"></div>
+        <button onclick="clearHistory()" style="margin-top: 10px;">Clear History</button>
+    </div>
+
+    <button class="theme-toggle" aria-label="Toggle theme">
+        <svg class="toggle-icon" viewBox="0 0 24 24">
+            <path id="sun" d="M12 18a6 6 0 1 1 0-12 6 6 0 0 1 0 12zm0-2a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM11 1h2v3h-2V1zm0 19h2v3h-2v-3zM3.5 4.9l1.4 1.4L5.9 5 4.5 3.6 3.5 4.9zm14.2 14.2l1.4 1.4 1.4-1.4-1.4-1.4-1.4 1.4zM1 11h3v2H1v-2zm19 0h3v2h-3v-2z"/>
+            <path id="moon" d="M12 3c.2 0 .4.02.6.05a7 7 0 0 0-1.86 12.1 7 7 0 0 0 9.21-9.21A7 7 0 0 0 12 3z" style="display: none;"/>
+        </svg>
+    </button>
+
+    <div class="chat-container">
+        <div class="chat-box" id="chat-box"></div>
+        <div class="input-container">
+            <input type="text" id="user-input" placeholder="Type your message...">
+            <button onclick="sendMessage()" aria-label="Send message" id="sendButton">Send</button>
+        </div>
+    </div>
+
+    <div class="contact-footer">
+        <a href="mailto:support@yourdomain.com">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8l8 5 8-5v10zm-8-7L4 6h16l-8 5z"/>
+            </svg>
+            Contact Support
+        </a>
+    </div>
+
+    <div class="prompt-bubble" id="helloPrompt">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="#3498db">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+        </svg>
+        Remember to start with "Hello"! 👋
+    </div>
+
+    <script>
+        // Theme Toggle Logic
+        const themeToggle = document.querySelector('.theme-toggle');
+        const sunIcon = document.querySelector('#sun');
+        const moonIcon = document.querySelector('#moon');
+        const body = document.body;
+
+        function toggleTheme() {
+            const isDark = body.getAttribute('data-theme') === 'dark';
+            body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+            sunIcon.style.display = isDark ? 'block' : 'none';
+            moonIcon.style.display = isDark ? 'none' : 'block';
+            localStorage.setItem('theme', isDark ? 'light' : 'dark');
+        }
+
+        // Initialize Theme
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        body.setAttribute('data-theme', savedTheme);
+        sunIcon.style.display = savedTheme === 'light' ? 'block' : 'none';
+        moonIcon.style.display = savedTheme === 'dark' ? 'block' : 'none';
+
+        themeToggle.addEventListener('click', toggleTheme);
+        themeToggle.addEventListener('touchend', toggleTheme);
+
+        // Chat History System
+        let chatHistory = JSON.parse(localStorage.getItem('chatHistory')) || [];
+        let messageCount = 0;
+
+        function saveToHistory(userMessage, botMessage) {
+            const chatEntry = {
+                timestamp: new Date().toISOString(),
+                user: userMessage,
+                bot: botMessage
+            };
+            
+            chatHistory.push(chatEntry);
+            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+            updateHistoryPanel();
+        }
+
+        function updateHistoryPanel() {
+            const historyList = document.getElementById('historyList');
+            historyList.innerHTML = chatHistory
+                .map((entry, index) => `
+                    <div class="history-item" onclick="loadHistory(${index})">
+                        <small>${new Date(entry.timestamp).toLocaleString()}</small><br>
+                        ${entry.user.substring(0, 30)}...
+                    </div>
+                `).join('');
+        }
+
+        function loadHistory(index) {
+            const entry = chatHistory[index];
+            const chatBox = document.getElementById('chat-box');
+            
+            chatBox.innerHTML = '';
+            
+            addMessage(entry.user, true);
+            addMessage(entry.bot, false);
+        }
+
+        function toggleHistory() {
+            const panel = document.getElementById('historyPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function clearHistory() {
+            localStorage.removeItem('chatHistory');
+            chatHistory = [];
+            updateHistoryPanel();
+        }
+
+        // Chatbot Logic
+        const responses = {
+            greetings: {
+                replies: [
+                    "Hello! Welcome to the Quests. How can I assist you today?",
+                    "Hi there! How can I help you with your query?",
+                    "Welcome to the Quests support! What can I do for you?"
+                ]
+            },
+            farewell: {
+                replies: [
+                    "Thank you for contacting the Quests Support! Have a great day!",
+                    "Goodbye! Don't hesitate to reach out if you need more help.",
+                    "Happy to assist! Come back anytime you have questions."
+                ]
+            },
+            default: [
+                "I'm sorry, I didn't understand that. Could you rephrase your question?",
+                "Let me connect you to a human agent for further assistance. Please hold...",
+                "For more complex queries, please visit our help center at help.the email below"
+            ]
+        };
+
+        function getPredefinedResponse(input) {
+            const lowerInput = input.toLowerCase().trim();
+            
+            const isGreeting = /^(hello|hi|hey|good morning|good afternoon)/i.test(lowerInput);
+            if (isGreeting) {
+                return responses.greetings.replies[Math.floor(Math.random() * responses.greetings.replies.length)];
+            }
+
+            const isFarewell = /^(bye|goodbye|see you|thanks|thank you)/i.test(lowerInput);
+            if (isFarewell) {
+                return responses.farewell.replies[Math.floor(Math.random() * responses.farewell.replies.length)];
+            }
+
+            return null;
+        }
+        // Add these 3 functions BEFORE sendMessage()
+function addMessage(message, isUser) {
+    const chatBox = document.getElementById('chat-box');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+    messageDiv.textContent = message;
+    chatBox.appendChild(messageDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+async function fetchChatGPTResponse(message) {
+    try {
+        const response = await fetch('/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message })
+        });
+        if (!response.ok) throw new Error('API Error');
+        const data = await response.json();
+        return data.reply || "I'm sorry, I couldn't process that request.";
+    } catch (error) {
+        return "Error connecting to chatbot service.";
+    }
+}
+
+async function fetchSearchResults(query) {
+    try {
+        const response = await fetch('/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query })
+        });
+        if (!response.ok) throw new Error('API Error');
+        const data = await response.json();
+        return data.results?.length > 0 
+            ? data.results.slice(0, 3).map(item => `${item.title}: ${item.link}`).join('\n')
+            : "No relevant results found.";
+    } catch (error) {
+        return "Error performing web search.";
+    }
+}
+        async function sendMessage() {
+            const userInput = document.getElementById('user-input');
+            const sendButton = document.getElementById('sendButton');
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            sendButton.disabled = true;
+            addMessage(message, true);
+            userInput.value = '';
+            try {
+                let response = getPredefinedResponse(message);
+                
+                if (!response) {
+                    if (message.toLowerCase().includes('search')) {
+                        response = await fetchSearchResults(message);
+                    } else {
+                        response = await fetchChatGPTResponse(message);
+                    }
+                }
+
+                if (!response) {
+                    response = responses.default[Math.floor(Math.random() * responses.default.length)];
+                }
+
+                addMessage(response, false);
+                saveToHistory(message, response);
+
+                if (messageCount++ === 0) {
+                    document.getElementById('helloPrompt').style.display = 'none';
+                }
+            } catch (error) {
+                addMessage("Sorry, I'm having trouble connecting. Please try again.", false);
+            } finally {
+                sendButton.disabled = false;
+            }
+        }
+
+        document.getElementById('user-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        document.getElementById('user-input').addEventListener('input', function() {
+            document.getElementById('helloPrompt').style.opacity = this.value.length > 0 ? '0.5' : '1';
+        });
+
+        document.addEventListener('DOMContentLoaded', updateHistoryPanel);
+    </script>
+</body>
+</html>

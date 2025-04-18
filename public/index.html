@@ -14,15 +14,20 @@
             --bg-color: #ffffff;
             --search-bg: #f8f9fa;
             --history-bg: rgba(255,255,255,0.9);
+            --bot-bg: #e9ecef;
+            --bot-text: #212529;
+            --transition-time: 0.3s;
         }
 
         [data-theme="dark"] {
             --header-bg: linear-gradient(135deg, #0f172a, #1e293b);
-            --text-color: #ffffff;
+            --text-color: #f8fafc;
             --accent: #7dd3fc;
             --bg-color: #0f172a;
             --search-bg: #1e293b;
             --history-bg: rgba(30, 41, 59, 0.9);
+            --bot-bg: #1e293b;
+            --bot-text: #e2e8f0;
         }
 
         body {
@@ -30,7 +35,7 @@
             margin: 0;
             background-color: var(--bg-color);
             color: var(--text-color);
-            transition: all 0.3s ease;
+            transition: background-color var(--transition-time), color var(--transition-time);
             min-height: 100vh;
         }
 
@@ -75,7 +80,7 @@
             background-color: var(--bg-color);
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            transition: all 0.3s ease;
+            transition: all var(--transition-time) ease;
         }
 
         .chat-box {
@@ -89,8 +94,7 @@
             padding: 10px 15px;
             border-radius: 20px;
             max-width: 70%;
-            transition: all 0.3s ease;
-            color: var(--text-color);
+            transition: all var(--transition-time) ease;
         }
 
         .user-message {
@@ -100,8 +104,10 @@
         }
 
         .bot-message {
-            background-color: #e9ecef;
+            background-color: var(--bot-bg);
+            color: var(--bot-text);
             margin-right: auto;
+            border: 1px solid rgba(0,0,0,0.1);
         }
 
         .search-results {
@@ -109,7 +115,8 @@
             text-align: left;
             padding: 15px;
             background-color: var(--search-bg) !important;
-            border: 1px solid #dee2e6;
+            border: 1px solid rgba(0,0,0,0.1);
+            color: var(--text-color);
         }
 
         .search-results a {
@@ -136,6 +143,7 @@
             margin-right: 10px;
             background-color: var(--bg-color);
             color: var(--text-color);
+            transition: all var(--transition-time) ease;
         }
 
         button {
@@ -145,7 +153,7 @@
             border: none;
             border-radius: 5px;
             cursor: pointer;
-            transition: background-color 0.3s ease;
+            transition: background-color var(--transition-time) ease;
         }
 
         .history-panel {
@@ -162,20 +170,21 @@
             overflow-y: auto;
             display: none;
             color: var(--text-color);
+            backdrop-filter: blur(10px);
+            transition: all var(--transition-time) ease;
         }
 
         .history-item {
             padding: 8px;
             margin: 5px 0;
-            background: rgba(0,0,0,0.1);
+            background: rgba(0,0,0,0.05);
             border-radius: 5px;
             cursor: pointer;
             transition: all 0.2s;
-            color: var(--text-color);
         }
 
         .history-item:hover {
-            background: rgba(0,0,0,0.2);
+            background: rgba(0,0,0,0.1);
         }
 
         .history-toggle {
@@ -188,6 +197,7 @@
             border: none;
             border-radius: 20px;
             cursor: pointer;
+            z-index: 1001;
         }
 
         .theme-toggle {
@@ -199,7 +209,7 @@
             cursor: pointer;
             padding: 8px;
             border-radius: 50%;
-            transition: background 0.3s ease;
+            transition: background var(--transition-time) ease;
             z-index: 1001;
         }
 
@@ -207,6 +217,7 @@
             width: 24px;
             height: 24px;
             fill: var(--text-color);
+            transition: fill var(--transition-time) ease;
         }
 
         .contact-footer {
@@ -220,7 +231,7 @@
             font-size: 14px;
             z-index: 1000;
             backdrop-filter: blur(5px);
-            transition: all 0.3s ease;
+            transition: all var(--transition-time) ease;
         }
 
         .contact-footer a {
@@ -246,6 +257,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            transition: all var(--transition-time) ease;
         }
 
         @keyframes float {
@@ -329,28 +341,40 @@
     </div>
 
     <script>
+        // Theme Management
+        const themeToggle = document.querySelector('.theme-toggle');
+        const sunIcon = document.getElementById('sun');
+        const moonIcon = document.getElementById('moon');
+        let currentTheme = localStorage.getItem('theme') || 'light';
+
+        // Initialize theme
+        document.body.setAttribute('data-theme', currentTheme);
+        sunIcon.style.display = currentTheme === 'light' ? 'block' : 'none';
+        moonIcon.style.display = currentTheme === 'dark' ? 'block' : 'none';
+
+        function toggleTheme() {
+            currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+            document.body.setAttribute('data-theme', currentTheme);
+            sunIcon.style.display = currentTheme === 'light' ? 'block' : 'none';
+            moonIcon.style.display = currentTheme === 'dark' ? 'block' : 'none';
+            localStorage.setItem('theme', currentTheme);
+        }
+
+        themeToggle.addEventListener('click', toggleTheme);
+
+        // Chat Functionality
         let chatHistory = JSON.parse(localStorage.getItem('chatHistory')) || [];
         let messageCount = 0;
 
-        // Theme Management
-        const themeToggle = document.querySelector('.theme-toggle');
-        document.body.setAttribute('data-theme', localStorage.getItem('theme') || 'light');
-        themeToggle.addEventListener('click', toggleTheme);
-
-        function toggleTheme() {
-            const isDark = document.body.getAttribute('data-theme') === 'dark';
-            document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
-            localStorage.setItem('theme', isDark ? 'light' : 'dark');
-        }
-
-        // Message Handling
         function addMessage(message, isUser, isSearch = false) {
             const chatBox = document.getElementById('chat-box');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'} ${isSearch ? 'search-results' : ''}`;
             
             if (isSearch) {
-                messageDiv.innerHTML = message.replace(/(https?:\/\/\S+)/g, '<a href="$1" target="_blank">$1</a>').replace(/\n/g, '<br>');
+                messageDiv.innerHTML = message
+                    .replace(/(https?:\/\/\S+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>')
+                    .replace(/\n/g, '<br>');
             } else {
                 messageDiv.textContent = message;
             }
@@ -373,6 +397,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message })
                 });
+                
+                if (!response.ok) throw new Error('API Error');
                 
                 const data = await response.json();
                 addMessage(data.reply, false, data.isSearch);
@@ -412,8 +438,8 @@
         }
 
         function toggleHistory() {
-            document.getElementById('historyPanel').style.display = 
-                document.getElementById('historyPanel').style.display === 'block' ? 'none' : 'block';
+            const panel = document.getElementById('historyPanel');
+            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
         }
 
         function clearHistory() {
@@ -423,8 +449,12 @@
         }
 
         // Event Listeners
-        document.getElementById('user-input').addEventListener('keypress', e => {
+        document.getElementById('user-input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') sendMessage();
+        });
+
+        document.getElementById('user-input').addEventListener('input', function() {
+            document.getElementById('helloPrompt').style.opacity = this.value.length > 0 ? '0.5' : '1';
         });
 
         document.addEventListener('DOMContentLoaded', updateHistory);

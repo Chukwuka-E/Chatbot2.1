@@ -2,12 +2,12 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "NodeNext",
-    "lib": ["ES2022", "DOM"],
+    "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
     "moduleResolution": "NodeNext",
-    "esModuleInterop": true,
+    "esModuleInterop": false,
     "baseUrl": "./src",
     "paths": {
       "@/*": ["./*"]
@@ -18,7 +18,10 @@
       "./src/types"
     ],
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "exactOptionalPropertyTypes": true
   },
   "include": [
     "src/**/*.ts",
@@ -28,6 +31,8 @@
     "node_modules",
     "dist",
     "**/*.test.ts",
-    "**/*.spec.ts"
+    "**/*.spec.ts",
+    "**/__tests__",
+    "**/__mocks__"
   ]
 }

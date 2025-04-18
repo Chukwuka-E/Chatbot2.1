@@ -156,17 +156,31 @@ app.post('/chat', (async (
   }
 }) as RequestHandler);
 
-// Error handler
+// Error handler (Fixed version)
 app.use((error: unknown, req: Request, res: Response, next: NextFunction) => {
   if (res.headersSent) return next(error);
-  
-  errorLogger(error, req, res, next);
-  
-  const message = error instanceof Error 
-    ? process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
-    : 'Unknown error';
-    
-  res.status(500).json({ error: message });
+
+  // Handle Error instances
+  if (error instanceof Error) {
+    errorLogger(error, req, res, () => {});
+    const message = process.env.NODE_ENV === 'production' 
+      ? 'Internal server error' 
+      : error.message;
+    return res.status(500).json({ error: message });
+  }
+
+  // Handle non-Error objects
+  const safeError = new Error(
+    typeof error === 'object' && error !== null
+      ? JSON.stringify(error)
+      : String(error)
+  );
+  errorLogger(safeError, req, res, () => {});
+  res.status(500).json({ 
+    error: process.env.NODE_ENV === 'production'
+      ? 'Internal server error'
+      : 'Unexpected error format'
+  });
 });
 
 // Server initialization

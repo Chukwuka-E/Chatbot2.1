@@ -34,15 +34,13 @@ const limiter = rateLimit({
 });
 app.use('/chat', limiter);
 
-// Security Middleware - Fixed redirect handling
+// Security Middleware
 app.set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : 'loopback');
 app.use((req: Request, res: Response, next: NextFunction) => {
   if (process.env.NODE_ENV === 'production') {
-    // Skip redirect for localhost
     if (req.headers.host?.startsWith('localhost')) return next();
     
     if (!req.secure) {
-      // Validate host header to prevent malformed URLs
       if (!req.headers.host || req.headers.host.includes(':')) {
          res.status(400).json({ error: 'Invalid request' });
       }
@@ -52,9 +50,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Path validation middleware (NEW)
+// Path validation middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
-  // Block paths with invalid characters that confuse path-to-regexp
   if (/[:*?]/.test(req.path)) {
      res.status(400).json({ error: 'Invalid URL pattern' });
   }
@@ -87,24 +84,54 @@ const logger = winston.createLogger({
 // Core Application Logic
 // ======================
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../public'))); // Go up one directory level
+app.use(express.static(path.join(__dirname, '../public')));
+
+// ======================
+// Helper Functions
+// ======================
+const detectSearchIntent = (message: string): boolean => {
+  const searchKeywords = ['search for', 'find', 'look up', 'current info on', 'latest about'];
+  return new RegExp(searchKeywords.join('|'), 'i').test(message);
+};
+
+const performSearch = async (query: string) => {
+  const serpApiKey = process.env.SERPAPI_KEY;
+  if (!serpApiKey) throw new Error('SerpAPI key missing');
+  
+  const response = await axios.get('https://serpapi.com/search', {
+    params: { q: query, api_key: serpApiKey },
+    timeout: 10000
+  });
+  
+  return response.data.organic_results || [];
+};
+
+const formatSearchResults = (results: any[]) => {
+  if (results.length === 0) return 'No relevant search results found.';
+  
+  return `Here's what I found:\n${results.slice(0, 3).map((result, i) => 
+    `${i + 1}. ${result.title}\n   ${result.link}\n   ${result.snippet}`
+  ).join('\n')}`;
+};
 
 // ======================
 // API Routes
 // ======================
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    status: 'ok',
-    timestamp: new Date().toISOString()
-  });
-});
-
 app.post('/chat', async (req: Request, res: Response) => {
   try {
     const userMessage: string = req.body?.message;
     if (!userMessage) {
       res.status(400).json({ error: 'Message required' });
       return;
+    }
+
+    if (detectSearchIntent(userMessage)) {
+      const searchResults = await performSearch(userMessage);
+      const formattedResults = formatSearchResults(searchResults);
+       res.json({ 
+        reply: formattedResults,
+        isSearch: true
+      });
     }
 
     const apiKey = process.env.OPENROUTER_API_KEY;
@@ -135,66 +162,17 @@ app.post('/chat', async (req: Request, res: Response) => {
     const reply = response.data?.choices?.[0]?.message?.content;
     if (!reply) throw new Error('Invalid OpenRouter response structure');
 
-    res.json({ reply });
+    res.json({ 
+      reply: reply,
+      isSearch: false
+    });
 
   } catch (error: any) {
-    logger.error(`OpenRouter Error: ${error.message}`);
+    logger.error(`Chat Error: ${error.message}`);
     res.status(500).json({
       error: error.response?.data?.error?.message || 'Chat service unavailable'
     });
   }
-});
-
-app.post('/search', async (req: Request, res: Response) => {
-  try {
-    const query: string = req.body?.query;
-    if (!query) {
-      res.status(400).json({ error: 'Query required' });
-      return;
-    }
-
-    const serpApiKey = process.env.SERPAPI_KEY;
-    if (!serpApiKey) {
-      logger.error('SerpAPI key missing');
-      res.status(500).json({ error: 'Server configuration error' });
-      return;
-    }
-
-    const response = await axios.get('https://serpapi.com/search', {
-      params: { q: query, api_key: serpApiKey },
-      timeout: 10000
-    });
-
-    res.json({ results: response.data.organic_results || [] });
-
-  } catch (error: any) {
-    logger.error(`SerpAPI Error: ${error.message}`);
-    res.status(500).json({ error: 'Search service unavailable' });
-  }
-});
-// ======================
-// Client-Side Routing (Updated validation)
-// ======================
-app.get('*', (req: Request, res: Response) => {
-  // Block invalid paths
-  if (req.path.includes(':') || req.method !== 'GET' || req.path.startsWith('/api')) {
-     res.status(404).json({ error: 'Not found' }); // Added return
-  }
-  
-  const filePath = path.join(__dirname, '../public', 'index.html'); // Correct path
-  if (!fs.existsSync(filePath)) {
-     res.status(500).json({ error: 'Client assets missing' }); // Added return
-  }
-
-  res.sendFile(filePath);
-});
-
-// ======================
-// Error Handling
-// ======================
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  logger.error(`Unhandled Error: ${err.message}`);
-  res.status(500).json({ error: 'Internal server error' });
 });
 
 // ======================

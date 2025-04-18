@@ -9,23 +9,28 @@
     <style>
         :root {
             --header-bg: linear-gradient(135deg, #2c3e50, #3498db);
-            --text-color: #ecf0f1;
+            --text-color: #2c3e50;
             --accent: #3498db;
             --bg-color: #ffffff;
+            --search-bg: #f8f9fa;
+            --history-bg: rgba(255,255,255,0.9);
         }
 
         [data-theme="dark"] {
             --header-bg: linear-gradient(135deg, #0f172a, #1e293b);
-            --text-color: #f8fafc;
+            --text-color: #ffffff;
             --accent: #7dd3fc;
             --bg-color: #0f172a;
+            --search-bg: #1e293b;
+            --history-bg: rgba(30, 41, 59, 0.9);
         }
 
         body {
             font-family: Arial, sans-serif;
             margin: 0;
             background-color: var(--bg-color);
-            transition: background 0.3s ease;
+            color: var(--text-color);
+            transition: all 0.3s ease;
             min-height: 100vh;
         }
 
@@ -84,7 +89,8 @@
             padding: 10px 15px;
             border-radius: 20px;
             max-width: 70%;
-            transition: background-color 0.3s ease;
+            transition: all 0.3s ease;
+            color: var(--text-color);
         }
 
         .user-message {
@@ -95,8 +101,25 @@
 
         .bot-message {
             background-color: #e9ecef;
-            color: black;
             margin-right: auto;
+        }
+
+        .search-results {
+            white-space: pre-line;
+            text-align: left;
+            padding: 15px;
+            background-color: var(--search-bg) !important;
+            border: 1px solid #dee2e6;
+        }
+
+        .search-results a {
+            color: var(--accent);
+            text-decoration: none;
+            word-break: break-all;
+        }
+
+        .search-results a:hover {
+            text-decoration: underline;
         }
 
         .input-container {
@@ -112,7 +135,7 @@
             border-radius: 5px;
             margin-right: 10px;
             background-color: var(--bg-color);
-            color: inherit;
+            color: var(--text-color);
         }
 
         button {
@@ -130,7 +153,7 @@
             left: 20px;
             top: 100px;
             width: 250px;
-            background: rgba(255,255,255,0.9);
+            background: var(--history-bg);
             border-radius: 10px;
             padding: 15px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
@@ -138,19 +161,21 @@
             max-height: 70vh;
             overflow-y: auto;
             display: none;
+            color: var(--text-color);
         }
 
         .history-item {
             padding: 8px;
             margin: 5px 0;
-            background: #f5f5f5;
+            background: rgba(0,0,0,0.1);
             border-radius: 5px;
             cursor: pointer;
             transition: all 0.2s;
+            color: var(--text-color);
         }
 
         .history-item:hover {
-            background: #e0e0e0;
+            background: rgba(0,0,0,0.2);
         }
 
         .history-toggle {
@@ -158,7 +183,7 @@
             left: 20px;
             top: 70px;
             padding: 8px 15px;
-            background: #3498db;
+            background: var(--accent);
             color: white;
             border: none;
             border-radius: 20px;
@@ -223,16 +248,6 @@
             gap: 10px;
         }
 
-        .prompt-bubble::before {
-            content: "";
-            position: absolute;
-            bottom: -10px;
-            left: 20px;
-            border-width: 10px 8px 0;
-            border-style: solid;
-            border-color: rgba(233,236,239,0.95) transparent transparent;
-        }
-
         @keyframes float {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-5px); }
@@ -276,13 +291,13 @@
         </div>
     </header>
 
-    <button class="history-toggle" onclick="toggleHistory()" aria-label="Chat history">Chat History</button>
+    <button class="history-toggle" onclick="toggleHistory()">Chat History</button>
     <div class="history-panel" id="historyPanel">
         <div id="historyList"></div>
         <button onclick="clearHistory()" style="margin-top: 10px;">Clear History</button>
     </div>
 
-    <button class="theme-toggle" aria-label="Toggle theme">
+    <button class="theme-toggle">
         <svg class="toggle-icon" viewBox="0 0 24 24">
             <path id="sun" d="M12 18a6 6 0 1 1 0-12 6 6 0 0 1 0 12zm0-2a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM11 1h2v3h-2V1zm0 19h2v3h-2v-3zM3.5 4.9l1.4 1.4L5.9 5 4.5 3.6 3.5 4.9zm14.2 14.2l1.4 1.4 1.4-1.4-1.4-1.4-1.4 1.4zM1 11h3v2H1v-2zm19 0h3v2h-3v-2z"/>
             <path id="moon" d="M12 3c.2 0 .4.02.6.05a7 7 0 0 0-1.86 12.1 7 7 0 0 0 9.21-9.21A7 7 0 0 0 12 3z" style="display: none;"/>
@@ -293,7 +308,7 @@
         <div class="chat-box" id="chat-box"></div>
         <div class="input-container">
             <input type="text" id="user-input" placeholder="Type your message...">
-            <button onclick="sendMessage()" aria-label="Send message" id="sendButton">Send</button>
+            <button onclick="sendMessage()" id="sendButton">Send</button>
         </div>
     </div>
 
@@ -314,202 +329,105 @@
     </div>
 
     <script>
-        // Theme Toggle Logic
-        const themeToggle = document.querySelector('.theme-toggle');
-        const sunIcon = document.querySelector('#sun');
-        const moonIcon = document.querySelector('#moon');
-        const body = document.body;
-
-        function toggleTheme() {
-            const isDark = body.getAttribute('data-theme') === 'dark';
-            body.setAttribute('data-theme', isDark ? 'light' : 'dark');
-            sunIcon.style.display = isDark ? 'block' : 'none';
-            moonIcon.style.display = isDark ? 'none' : 'block';
-            localStorage.setItem('theme', isDark ? 'light' : 'dark');
-        }
-
-        // Initialize Theme
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        body.setAttribute('data-theme', savedTheme);
-        sunIcon.style.display = savedTheme === 'light' ? 'block' : 'none';
-        moonIcon.style.display = savedTheme === 'dark' ? 'block' : 'none';
-
-        themeToggle.addEventListener('click', toggleTheme);
-        themeToggle.addEventListener('touchend', toggleTheme);
-
-        // Chat History System
         let chatHistory = JSON.parse(localStorage.getItem('chatHistory')) || [];
         let messageCount = 0;
 
-        function saveToHistory(userMessage, botMessage) {
-            const chatEntry = {
-                timestamp: new Date().toISOString(),
-                user: userMessage,
-                bot: botMessage
-            };
-            
-            chatHistory.push(chatEntry);
-            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
-            updateHistoryPanel();
+        // Theme Management
+        const themeToggle = document.querySelector('.theme-toggle');
+        document.body.setAttribute('data-theme', localStorage.getItem('theme') || 'light');
+        themeToggle.addEventListener('click', toggleTheme);
+
+        function toggleTheme() {
+            const isDark = document.body.getAttribute('data-theme') === 'dark';
+            document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+            localStorage.setItem('theme', isDark ? 'light' : 'dark');
         }
 
-        function updateHistoryPanel() {
-            const historyList = document.getElementById('historyList');
-            historyList.innerHTML = chatHistory
-                .map((entry, index) => `
-                    <div class="history-item" onclick="loadHistory(${index})">
-                        <small>${new Date(entry.timestamp).toLocaleString()}</small><br>
-                        ${entry.user.substring(0, 30)}...
-                    </div>
-                `).join('');
-        }
-
-        function loadHistory(index) {
-            const entry = chatHistory[index];
+        // Message Handling
+        function addMessage(message, isUser, isSearch = false) {
             const chatBox = document.getElementById('chat-box');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'} ${isSearch ? 'search-results' : ''}`;
             
-            chatBox.innerHTML = '';
-            
-            addMessage(entry.user, true);
-            addMessage(entry.bot, false);
-        }
-
-        function toggleHistory() {
-            const panel = document.getElementById('historyPanel');
-            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-        }
-
-        function clearHistory() {
-            localStorage.removeItem('chatHistory');
-            chatHistory = [];
-            updateHistoryPanel();
-        }
-
-        // Chatbot Logic
-        const responses = {
-            greetings: {
-                replies: [
-                    "Hello! Welcome to the Quests. How can I assist you today?",
-                    "Hi there! How can I help you with your query?",
-                    "Welcome to the Quests support! What can I do for you?"
-                ]
-            },
-            farewell: {
-                replies: [
-                    "Thank you for contacting the Quests Support! Have a great day!",
-                    "Goodbye! Don't hesitate to reach out if you need more help.",
-                    "Happy to assist! Come back anytime you have questions."
-                ]
-            },
-            default: [
-                "I'm sorry, I didn't understand that. Could you rephrase your question?",
-                "Let me connect you to a human agent for further assistance. Please hold...",
-                "For more complex queries, please visit our help center at help.the email below"
-            ]
-        };
-
-        function getPredefinedResponse(input) {
-            const lowerInput = input.toLowerCase().trim();
-            
-            const isGreeting = /^(hello|hi|hey|good morning|good afternoon)/i.test(lowerInput);
-            if (isGreeting) {
-                return responses.greetings.replies[Math.floor(Math.random() * responses.greetings.replies.length)];
+            if (isSearch) {
+                messageDiv.innerHTML = message.replace(/(https?:\/\/\S+)/g, '<a href="$1" target="_blank">$1</a>').replace(/\n/g, '<br>');
+            } else {
+                messageDiv.textContent = message;
             }
-
-            const isFarewell = /^(bye|goodbye|see you|thanks|thank you)/i.test(lowerInput);
-            if (isFarewell) {
-                return responses.farewell.replies[Math.floor(Math.random() * responses.farewell.replies.length)];
-            }
-
-            return null;
+            
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
-        // Add these 3 functions BEFORE sendMessage()
-function addMessage(message, isUser) {
-    const chatBox = document.getElementById('chat-box');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-    messageDiv.textContent = message;
-    chatBox.appendChild(messageDiv);
-    chatBox.scrollTop = chatBox.scrollHeight;
-}
 
-async function fetchChatGPTResponse(message) {
-    try {
-        const response = await fetch('/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message })
-        });
-        if (!response.ok) throw new Error('API Error');
-        const data = await response.json();
-        return data.reply || "I'm sorry, I couldn't process that request.";
-    } catch (error) {
-        return "Error connecting to chatbot service.";
-    }
-}
-
-async function fetchSearchResults(query) {
-    try {
-        const response = await fetch('/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query })
-        });
-        if (!response.ok) throw new Error('API Error');
-        const data = await response.json();
-        return data.results?.length > 0 
-            ? data.results.slice(0, 3).map(item => `${item.title}: ${item.link}`).join('\n')
-            : "No relevant results found.";
-    } catch (error) {
-        return "Error performing web search.";
-    }
-}
         async function sendMessage() {
-            const userInput = document.getElementById('user-input');
-            const sendButton = document.getElementById('sendButton');
-            const message = userInput.value.trim();
+            const input = document.getElementById('user-input');
+            const message = input.value.trim();
             if (!message) return;
 
-            sendButton.disabled = true;
+            input.value = '';
             addMessage(message, true);
-            userInput.value = '';
+
             try {
-                let response = getPredefinedResponse(message);
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
                 
-                if (!response) {
-                    if (message.toLowerCase().includes('search')) {
-                        response = await fetchSearchResults(message);
-                    } else {
-                        response = await fetchChatGPTResponse(message);
-                    }
-                }
-
-                if (!response) {
-                    response = responses.default[Math.floor(Math.random() * responses.default.length)];
-                }
-
-                addMessage(response, false);
-                saveToHistory(message, response);
+                const data = await response.json();
+                addMessage(data.reply, false, data.isSearch);
+                
+                chatHistory.push({
+                    user: message,
+                    bot: data.reply,
+                    isSearch: data.isSearch,
+                    timestamp: new Date().toISOString()
+                });
+                localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
 
                 if (messageCount++ === 0) {
                     document.getElementById('helloPrompt').style.display = 'none';
                 }
             } catch (error) {
                 addMessage("Sorry, I'm having trouble connecting. Please try again.", false);
-            } finally {
-                sendButton.disabled = false;
             }
         }
 
-        document.getElementById('user-input').addEventListener('keypress', (e) => {
+        // History Management
+        function updateHistory() {
+            const historyList = document.getElementById('historyList');
+            historyList.innerHTML = chatHistory.map((entry, index) => `
+                <div class="history-item" onclick="loadHistory(${index})">
+                    <small>${new Date(entry.timestamp).toLocaleString()}</small><br>
+                    ${entry.user.substring(0, 30)}...
+                </div>
+            `).join('');
+        }
+
+        function loadHistory(index) {
+            const chatBox = document.getElementById('chat-box');
+            chatBox.innerHTML = '';
+            addMessage(chatHistory[index].user, true);
+            addMessage(chatHistory[index].bot, false, chatHistory[index].isSearch);
+        }
+
+        function toggleHistory() {
+            document.getElementById('historyPanel').style.display = 
+                document.getElementById('historyPanel').style.display === 'block' ? 'none' : 'block';
+        }
+
+        function clearHistory() {
+            localStorage.removeItem('chatHistory');
+            chatHistory = [];
+            updateHistory();
+        }
+
+        // Event Listeners
+        document.getElementById('user-input').addEventListener('keypress', e => {
             if (e.key === 'Enter') sendMessage();
         });
 
-        document.getElementById('user-input').addEventListener('input', function() {
-            document.getElementById('helloPrompt').style.opacity = this.value.length > 0 ? '0.5' : '1';
-        });
-
-        document.addEventListener('DOMContentLoaded', updateHistoryPanel);
+        document.addEventListener('DOMContentLoaded', updateHistory);
     </script>
 </body>
 </html>

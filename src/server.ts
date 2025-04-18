@@ -1,38 +1,53 @@
+import { fileURLToPath } from 'url';
+import path from 'path';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Load environment variables first
 import dotenv from 'dotenv';
 dotenv.config();
 
-import express, { Request, Response, NextFunction, Application, RequestHandler } from 'express';
+import express, { type Request, type Response, type NextFunction, type Application, type RequestHandler } from 'express';
 import axios from 'axios';
 import cors from 'cors';
-import path from 'path';
 import rateLimit from 'express-rate-limit';
-import logger, { requestLogger, errorLogger } from '@/utils/logger';
-import { SearchResult } from '@/types/global';
+import { logger, requestLogger, errorLogger } from './utils/logger.js';
+import type { SearchResult } from './types/global.js';
 
-// Create Express application with explicit type
+// Create Express application
 const app: Application = express();
-const PORT = parseInt(process.env.PORT || '3000', 10);
+const PORT = parseInt(process.env.PORT ?? '3000', 10);
 
 // Middleware setup
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../public')));
+app.use(express.static(path.join(__dirname, '../../public')));
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || [
+  origin: process.env.ALLOWED_ORIGINS?.split(',') ?? [
     'http://localhost:3000',
     'https://chatbot-cwg0.onrender.com'
   ],
   methods: ['GET', 'POST']
 }));
 
-// Context middleware with proper typing
+// Custom request context
+declare global {
+  namespace Express {
+    interface Request {
+      context: {
+        startTime: number;
+        ip: string;
+        userAgent: string;
+      };
+    }
+  }
+}
+
 app.use((req: Request, res: Response, next: NextFunction) => {
-  // Extend Request type via declaration merging (defined in types/express.d.ts)
   req.context = {
     startTime: Date.now(),
-    ip: req.ip || 'unknown-ip',
-    userAgent: req.get('User-Agent') || ''
+    ip: req.ip ?? 'unknown-ip',
+    userAgent: req.get('User-Agent') ?? ''
   };
   next();
 });
@@ -40,7 +55,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // Request logging
 app.use(requestLogger);
 
-// Rate limiting middleware
+// Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -51,7 +66,7 @@ const limiter = rateLimit({
 });
 app.use('/chat', limiter);
 
-// Search functionality implementation
+// Search functionality
 const detectSearchIntent = (message: string): boolean => {
   const searchKeywords = ['search for', 'find', 'look up', 'current info on', 'latest about'];
   return new RegExp(searchKeywords.join('|'), 'i').test(message);
@@ -66,7 +81,7 @@ const performSearch = async (query: string): Promise<SearchResult[]> => {
     timeout: 10000
   });
 
-  return response.data.organic_results || [];
+  return response.data.organic_results ?? [];
 };
 
 const formatSearchResults = (results: SearchResult[]): string => {
@@ -76,7 +91,7 @@ const formatSearchResults = (results: SearchResult[]): string => {
     .join('\n');
 };
 
-// Chat handler implementation
+// Chat handler
 const handleOpenRouterRequest = async (userMessage: string) => {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error('OpenRouter API key missing');
@@ -93,7 +108,7 @@ const handleOpenRouterRequest = async (userMessage: string) => {
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': process.env.HTTP_REFERER || 'http://localhost:3000',
+          'HTTP-Referer': process.env.HTTP_REFERER ?? 'http://localhost:3000',
           'X-Title': 'Quest Support Chatbot'
         },
         timeout: 10000
@@ -108,13 +123,14 @@ const handleOpenRouterRequest = async (userMessage: string) => {
       reply: response.data.choices[0].message.content, 
       isSearch: false 
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('OpenRouter API Failure', error);
-    throw new Error(error.response?.data?.error?.message || 'Chat service error');
+    const message = error instanceof Error ? error.message : 'Unknown chat error';
+    throw new Error(message);
   }
 };
 
-// Chat endpoint with proper typing
+// Chat endpoint
 app.post('/chat', (async (
   req: Request,
   res: Response,
@@ -135,25 +151,25 @@ app.post('/chat', (async (
     const { reply } = await handleOpenRouterRequest(userMessage);
     return res.json({ reply, isSearch: false });
 
-  } catch (error: any) {
-    next(error);
+  } catch (error: unknown) {
+    next(error instanceof Error ? error : new Error('Unknown error'));
   }
 }) as RequestHandler);
 
-// Error handling middleware
-app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
-  if (res.headersSent) {
-    return next(error); // Don't send response if already sent
-  }
+// Error handler
+app.use((error: unknown, req: Request, res: Response, next: NextFunction) => {
+  if (res.headersSent) return next(error);
+  
   errorLogger(error, req, res, next);
-  res.status(500).json({ 
-    error: process.env.NODE_ENV === 'production' 
-      ? 'Internal server error' 
-      : error.message 
-  });
+  
+  const message = error instanceof Error 
+    ? process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
+    : 'Unknown error';
+    
+  res.status(500).json({ error: message });
 });
 
-// Server startup validation
+// Server initialization
 const startServer = () => {
   if (!process.env.OPENROUTER_API_KEY) {
     logger.error('FATAL: Missing OpenRouter API key');
@@ -174,5 +190,4 @@ const startServer = () => {
   });
 };
 
-// Start the server
 startServer();

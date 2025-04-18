@@ -1,13 +1,17 @@
-import { Request, Response, NextFunction } from 'express';
+// src/utils/logger.ts
+import type { Request, Response, NextFunction } from 'express';
 import winston from 'winston';
-import { Environment } from '@/types/global';
 
-const NODE_ENV = process.env.NODE_ENV as Environment || 'development';
+// Environment type moved here for self-containment
+type Environment = 'development' | 'production' | 'test';
+
+const NODE_ENV = (process.env.NODE_ENV as Environment) || 'development';
 
 const logFormat = winston.format.printf(({ timestamp, level, message, stack }) => {
   return `${timestamp} [${level}] ${stack || message}`;
 });
 
+// Main logger instance
 const logger = winston.createLogger({
   level: NODE_ENV === 'development' ? 'debug' : 'info',
   format: winston.format.combine(
@@ -21,18 +25,31 @@ const logger = winston.createLogger({
   transports: [
     new winston.transports.Console(),
     new winston.transports.File({ filename: 'logs/combined.log' }),
-    new winston.transports.File({ filename: 'logs/errors.log', level: 'error' })
+    new winston.transports.File({ 
+      filename: 'logs/errors.log', 
+      level: 'error',
+      handleRejections: true
+    })
   ]
 });
 
+// Enhanced request typing
+interface ContextRequest extends Request {
+  context: {
+    startTime: number;
+    ip: string;
+    userAgent: string;
+  };
+}
+
 export const requestLogger = (
-  req: Request,
+  req: ContextRequest,
   res: Response,
   next: NextFunction
 ) => {
   req.context = {
     startTime: Date.now(),
-    ip: req.ip,
+    ip: req.ip || 'unknown-ip',
     userAgent: req.get('User-Agent') || ''
   };
 
@@ -62,4 +79,5 @@ export const errorLogger = (
   next(error);
 };
 
-export default logger;
+// Named export instead of default
+export { logger };

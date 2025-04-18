@@ -1,19 +1,37 @@
-import { Request, Response, NextFunction } from 'express';
+// src/types/express.d.ts
+import type { Request, Response, NextFunction, Application } from 'express';
 
-declare module 'express-serve-static-core' {
-  interface Request {
-    context?: {
-      startTime: number;
-      ip: string;
-      userAgent?: string;
-    };
+declare global {
+  namespace Express {
+    // Enhanced Request type
+    interface Request {
+      context: {
+        startTime: number;
+        ip: string;
+        userAgent: string;
+      };
+    }
+
+    // Enhanced Application type
+    interface Application {
+      use: (
+        middleware: (
+          req: Request,
+          res: Response,
+          next: NextFunction
+        ) => void
+      ) => this;
+    }
   }
 }
 
-declare module 'express' {
-  export interface Application {
-    use(middleware: (req: Request, res: Response, next: NextFunction) => void): this;
-    use(path: string, middleware: (req: Request, res: Response, next: NextFunction) => void): this;
-    use(errorHandler: (error: Error, req: Request, res: Response, next: NextFunction) => void): this;
-  }
+// Export merged interfaces
+export interface ContextEnhancedRequest extends Request {
+  context: {
+    startTime: number;
+    ip: string;
+    userAgent: string;
+  };
 }
+
+export interface EnhancedApplication extends Application {}

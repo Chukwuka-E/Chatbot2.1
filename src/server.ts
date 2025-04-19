@@ -6,7 +6,7 @@ import axios from 'axios';
 import cors from 'cors';
 import path from 'path';
 import rateLimit from 'express-rate-limit';
-import logger, { requestLogger, errorLogger } from '@/utils/logger';
+import logger, { requestLogger, errorLogger } from './utils/logger';
 import { SearchResult } from '@/types/global';
 
 // Create Express application with explicit type

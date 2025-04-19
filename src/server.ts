@@ -1,119 +1,87 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-import express, { Request, Response, NextFunction } from 'express';
+import express, { Request, Response, NextFunction, Application, RequestHandler } from 'express';
 import axios from 'axios';
 import cors from 'cors';
 import path from 'path';
-import fs from 'fs';
-import winston from 'winston';
 import rateLimit from 'express-rate-limit';
+import logger, { requestLogger, errorLogger } from '@/utils/logger';
+import { SearchResult } from '@/types/global';
 
-const app = express();
+// Create Express application with explicit type
+const app: Application = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
-// ======================
-// Middleware Setup
-// ======================
-const allowedOrigins = [
-  'https://chatbot-cwg0.onrender.com',
-  'http://localhost:3000'
-];
+// Middleware setup
+app.use(express.json());
+app.use(express.static(path.join(__dirname, '../public')));
 
+// CORS configuration
 app.use(cors({
-  origin: allowedOrigins,
-  methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || [
+    'http://localhost:3000',
+    'https://your-production-domain.com'
+  ],
+  methods: ['GET', 'POST']
 }));
 
-// Rate Limiting
+// Context middleware with proper typing
+app.use((req: Request, res: Response, next: NextFunction) => {
+  // Extend Request type via declaration merging (defined in types/express.d.ts)
+  req.context = {
+    startTime: Date.now(),
+    ip: req.ip || 'unknown-ip',
+    userAgent: req.get('User-Agent') || ''
+  };
+  next();
+});
+
+// Request logging
+app.use(requestLogger);
+
+// Rate limiting middleware
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
-  keyGenerator: (req: Request) => req.ip || 'default-key',
+  handler: (req, res) => {
+    logger.warn(`Rate limit exceeded for IP: ${req.ip}`);
+    res.status(429).json({ error: 'Too many requests' });
+  }
 });
 app.use('/chat', limiter);
 
-// Security Middleware - Fixed redirect handling
-app.set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : 'loopback');
-app.use((req: Request, res: Response, next: NextFunction) => {
-  if (process.env.NODE_ENV === 'production') {
-    // Skip redirect for localhost
-    if (req.headers.host?.startsWith('localhost')) return next();
-    
-    if (!req.secure) {
-      // Validate host header to prevent malformed URLs
-      if (!req.headers.host || req.headers.host.includes(':')) {
-         res.status(400).json({ error: 'Invalid request' });
-      }
-      return res.redirect(301, `https://${req.headers.host}${req.url}`);
-    }
-  }
-  next();
-});
+// Search functionality implementation
+const detectSearchIntent = (message: string): boolean => {
+  const searchKeywords = ['search for', 'find', 'look up', 'current info on', 'latest about'];
+  return new RegExp(searchKeywords.join('|'), 'i').test(message);
+};
 
-// Path validation middleware (NEW)
-app.use((req: Request, res: Response, next: NextFunction) => {
-  // Block paths with invalid characters that confuse path-to-regexp
-  if (/[:*?]/.test(req.path)) {
-     res.status(400).json({ error: 'Invalid URL pattern' });
-  }
-  next();
-});
+const performSearch = async (query: string): Promise<SearchResult[]> => {
+  const apiKey = process.env.SERPAPI_KEY;
+  if (!apiKey) throw new Error('SerpAPI key missing');
 
-// ======================
-// Logging Configuration
-// ======================
-const logsDir = path.join(__dirname, 'logs');
-if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir);
-
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    winston.format.printf(({ timestamp, level, message }) => 
-      `${timestamp} [${level}]: ${message}`
-    )
-  ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ 
-      filename: path.join(logsDir, 'server.log') 
-    })
-  ]
-});
-
-// ======================
-// Core Application Logic
-// ======================
-app.use(express.json());
-app.use(express.static(path.join(__dirname, '../public'))); // Go up one directory level
-
-// ======================
-// API Routes
-// ======================
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    status: 'ok',
-    timestamp: new Date().toISOString()
+  const response = await axios.get('https://serpapi.com/search', {
+    params: { q: query, api_key: apiKey },
+    timeout: 10000
   });
-});
 
-app.post('/chat', async (req: Request, res: Response) => {
+  return response.data.organic_results || [];
+};
+
+const formatSearchResults = (results: SearchResult[]): string => {
+  if (!results.length) return 'No relevant results found.';
+  return results.slice(0, 3)
+    .map((result, index) => `${index + 1}. ${result.title}\n   ${result.link}\n   ${result.snippet}`)
+    .join('\n');
+};
+
+// Chat handler implementation
+const handleOpenRouterRequest = async (userMessage: string) => {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error('OpenRouter API key missing');
+
   try {
-    const userMessage: string = req.body?.message;
-    if (!userMessage) {
-      res.status(400).json({ error: 'Message required' });
-      return;
-    }
-
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
-      logger.error('OpenRouter API key missing');
-      res.status(500).json({ error: 'Server configuration error' });
-      return;
-    }
-
     const response = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
       {
@@ -125,81 +93,83 @@ app.post('/chat', async (req: Request, res: Response) => {
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://chatbot-cwg0.onrender.com',
+          'HTTP-Referer': process.env.HTTP_REFERER || 'http://localhost:3000',
           'X-Title': 'Quest Support Chatbot'
         },
         timeout: 10000
       }
     );
 
-    const reply = response.data?.choices?.[0]?.message?.content;
-    if (!reply) throw new Error('Invalid OpenRouter response structure');
+    if (!response.data?.choices?.[0]?.message?.content) {
+      throw new Error('Unexpected response structure');
+    }
 
-    res.json({ reply });
-
+    return { 
+      reply: response.data.choices[0].message.content, 
+      isSearch: false 
+    };
   } catch (error: any) {
-    logger.error(`OpenRouter Error: ${error.message}`);
-    res.status(500).json({
-      error: error.response?.data?.error?.message || 'Chat service unavailable'
-    });
+    logger.error('OpenRouter API Failure', error);
+    throw new Error(error.response?.data?.error?.message || 'Chat service error');
   }
-});
+};
 
-app.post('/search', async (req: Request, res: Response) => {
+// Chat endpoint with proper typing
+app.post('/chat', (async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
-    const query: string = req.body?.query;
-    if (!query) {
-      res.status(400).json({ error: 'Query required' });
-      return;
+    const userMessage = req.body?.message?.trim();
+    if (!userMessage) {
+      return res.status(400).json({ error: 'Message required' });
     }
 
-    const serpApiKey = process.env.SERPAPI_KEY;
-    if (!serpApiKey) {
-      logger.error('SerpAPI key missing');
-      res.status(500).json({ error: 'Server configuration error' });
-      return;
+    if (detectSearchIntent(userMessage)) {
+      const searchResults = await performSearch(userMessage);
+      const formattedResults = formatSearchResults(searchResults);
+      return res.json({ reply: formattedResults, isSearch: true });
     }
 
-    const response = await axios.get('https://serpapi.com/search', {
-      params: { q: query, api_key: serpApiKey },
-      timeout: 10000
-    });
-
-    res.json({ results: response.data.organic_results || [] });
+    const { reply } = await handleOpenRouterRequest(userMessage);
+    return res.json({ reply, isSearch: false });
 
   } catch (error: any) {
-    logger.error(`SerpAPI Error: ${error.message}`);
-    res.status(500).json({ error: 'Search service unavailable' });
+    next(error);
   }
-});
-// ======================
-// Client-Side Routing (Updated validation)
-// ======================
-app.get('*', (req: Request, res: Response) => {
-  // Block invalid paths
-  if (req.path.includes(':') || req.method !== 'GET' || req.path.startsWith('/api')) {
-     res.status(404).json({ error: 'Not found' }); // Added return
-  }
-  
-  const filePath = path.join(__dirname, '../public', 'index.html'); // Correct path
-  if (!fs.existsSync(filePath)) {
-     res.status(500).json({ error: 'Client assets missing' }); // Added return
-  }
+}) as RequestHandler);
 
-  res.sendFile(filePath);
+// Error handling middleware
+app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
+  errorLogger(error, req, res, next);
+  res.status(500).json({ 
+    error: process.env.NODE_ENV === 'production' 
+      ? 'Internal server error' 
+      : error.message 
+  });
 });
 
-// ======================
-// Error Handling
-// ======================
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  logger.error(`Unhandled Error: ${err.message}`);
-  res.status(500).json({ error: 'Internal server error' });
-});
+// Server startup validation
+const startServer = () => {
+  if (!process.env.OPENROUTER_API_KEY) {
+    logger.error('FATAL: Missing OpenRouter API key');
+    process.exit(1);
+  }
 
-// ======================
-// Server Initialization
-// ======================
-app.listen(PORT, '0.0.0.0', () => {
-  logger.info(`✅ Server running on port ${PORT}`);
-});
+  if (!process.env.SERPAPI_KEY) {
+    logger.warn('Search functionality disabled - missing SerpAPI key');
+  }
+
+  app.listen(PORT, () => {
+    logger.info(`Server running on port ${PORT}`);
+    logger.debug('Environment:', {
+      NODE_ENV: process.env.NODE_ENV,
+      PORT,
+      ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS
+    });
+  });
+};
+
+// Start the server
+startServer();
